@@ -3,15 +3,16 @@ const { MongoClient } = require('mongodb');
 require('dotenv').config();
 const cors = require('cors');
 const ObjectID = require('mongodb').ObjectId;
-var admin = require("firebase-admin");
+const admin = require("firebase-admin");
 
 const app = express();
+// middleware
+app.use(cors());
+app.use(express.json());
 const port = process.env.PORT || 5000;
 
 // firebase admin initialization 
-
 var serviceAccount = require("./road-bolt-firebase-adminsdk-wjy6u-c05a746e2b.json");
-
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
@@ -57,6 +58,14 @@ async function run() {
                 products
             });
         });
+        app.get('/review', async (req, res) => {
+            const cursor = reviewCollection.find({});
+            const review = await cursor.toArray();
+                
+            res.send({              
+                review
+            });
+        });
 
         // Use POST to get data by keys
         app.post('/services/bykeys', async (req, res) => {
@@ -67,19 +76,15 @@ async function run() {
         });
 
         // Add Orders API
-        app.get('/booked_service', verifyToken, async (req, res) => {
-            const email = req.query.email;
-            if (req.decodedUserEmail === email) {
-                const query = { email: email };
-                const cursor = orderCollection.find(query);
+        app.get('/booked_service', async (req, res) => {
+    
+                const cursor = orderCollection.find({});
                 const orders = await cursor.toArray();
-                res.json(orders);
+                res.send({              
+                  orders
+              });
             }
-            else {
-                res.status(401).json({ message: 'User not authorized' })
-            }
-
-        });
+        );
 
         app.post('/booked_service', async (req, res) => {
             const order = req.body;
@@ -97,10 +102,18 @@ async function run() {
 
             res.json(result);
         })
+        // Delete Products
+        app.delete('/services/:key',async(req,res)=>{
+            const id = req.params.key;
+            const query = {_id: ObjectID(id)};
+            const result = await productCollection.deleteOne(query);
+            console.log(result, 'delete')
+
+            res.json(result);
+        })
 
 //dashboard server
-
-          // add user info 
+// add user info 
 
           app.post("/addUserInfo", async (req, res) => {
             console.log("req.body");
@@ -118,12 +131,6 @@ async function run() {
         $set: { role: "admin" },
       });
       console.log(documents);
-    }
-    else {
-      const role = "admin";
-      const result3 = await usersCollection.insertOne(req.body.email, {
-        role: role,
-      });
     }
   });
 
@@ -152,7 +159,7 @@ async function run() {
     //  my order
     app.get("/myOrder/:email", async (req, res) => {
         console.log(req.params.email);
-        const result = await ordersCollection
+        const result = await orderCollection
           .find({ email: req.params.email })
           .toArray();
         res.send(result);
@@ -167,7 +174,7 @@ async function run() {
 run().catch(console.dir);
 
 app.get('/', (req, res) => {
-    res.send('TOUR de WORLD server is running');
+    res.send('Road Bolt server is running');
 });
 
 app.listen(port, () => {
